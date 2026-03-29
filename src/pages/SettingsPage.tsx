@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useGoal } from '@/context/GoalContext'
 import { useFood } from '@/context/FoodContext'
 import { usePlan } from '@/context/PlanContext'
-import { clearAllData } from '@/utils/db'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -18,6 +19,7 @@ export function SettingsPage() {
 
   const { foods } = useFood()
   const { plans } = usePlan()
+  const { user, signOut } = useAuth()
 
   const handleSaveGoal = () => {
     const n = Number(kcalInput)
@@ -32,9 +34,13 @@ export function SettingsPage() {
   }
 
   const handleReset = async () => {
-    await clearAllData()
-    localStorage.removeItem('ziadregim-goal')
-    window.location.reload()
+    if (!user) return
+    await Promise.all([
+      supabase.from('foods').delete().eq('user_id', user.id),
+      supabase.from('daily_plans').delete().eq('user_id', user.id),
+      supabase.from('user_settings').delete().eq('user_id', user.id),
+    ])
+    await signOut()
   }
 
   const planCount = Object.keys(plans).length

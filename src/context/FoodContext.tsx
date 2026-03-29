@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { v4 as uuidv4 } from 'uuid'
-import { getAllFoods, putFood, deleteFood as dbDeleteFood } from '@/utils/db'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import type { FoodItem } from '@/types'
 
 interface FoodContextValue {
@@ -14,36 +14,88 @@ interface FoodContextValue {
 
 const FoodContext = createContext<FoodContextValue | null>(null)
 
+function rowToFoodItem(row: Record<string, unknown>): FoodItem {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    caloriesPer100g: row.calories_per_100g as number,
+    unit: row.unit as 'g' | 'unit',
+    gramsPerUnit: row.grams_per_unit as number | undefined,
+    quantityInStock: row.quantity_in_stock as number,
+    category: row.category as string | undefined,
+    proteins: row.proteins as number | undefined,
+    lipids: row.lipids as number | undefined,
+    carbs: row.carbs as number | undefined,
+    fiber: row.fiber as number | undefined,
+    createdAt: row.created_at as string,
+  }
+}
+
 export function FoodProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [foods, setFoods] = useState<FoodItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getAllFoods()
-      .then(setFoods)
-      .finally(() => setLoading(false))
-  }, [])
+    if (!user) { setFoods([]); setLoading(false); return }
+    setLoading(true)
+    supabase
+      .from('foods')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        setFoods((data ?? []).map(rowToFoodItem))
+        setLoading(false)
+      })
+  }, [user])
 
   const addFood = useCallback(async (data: Omit<FoodItem, 'id' | 'createdAt'>) => {
-    const food: FoodItem = { ...data, id: uuidv4(), createdAt: new Date().toISOString() }
-    await putFood(food)
-    setFoods((prev) => [...prev, food])
-  }, [])
+    if (!user) return
+    const { data: row } = await supabase
+      .from('foods')
+      .insert({
+        user_id: user.id,
+        name: data.name,
+        calories_per_100g: data.caloriesPer100g,
+        unit: data.unit,
+        grams_per_unit: data.gramsPerUnit,
+        quantity_in_stock: data.quantityInStock,
+        category: data.category,
+        proteins: data.proteins,
+        lipids: data.lipids,
+        carbs: data.carbs,
+        fiber: data.fiber,
+      })
+      .select()
+      .single()
+    if (row) setFoods((prev) => [...prev, rowToFoodItem(row)])
+  }, [user])
 
   const updateFood = useCallback(
     async (id: string, patch: Partial<Omit<FoodItem, 'id' | 'createdAt'>>) => {
-      setFoods((prev) => {
-        const updated = prev.map((f) => (f.id === id ? { ...f, ...patch } : f))
-        const food = updated.find((f) => f.id === id)
-        if (food) putFood(food)
-        return updated
-      })
+      const dbPatch: Record<string, unknown> = {}
+      if (patch.name !== undefined) dbPatch.name = patch.name
+      if (patch.caloriesPer100g !== undefined) dbPatch.calories_per_100g = patch.caloriesPer100g
+      if (patch.unit !== undefined) dbPatch.unit = patch.unit
+      if (patch.gramsPerUnit !== undefined) dbPatch.grams_per_unit = patch.gramsPerUnit
+      if (patch.quantityInStock !== undefined) dbPatch.quantity_in_stock = patch.quantityInStock
+      if (patch.category !== undefined) dbPatch.category = patch.category
+      if (patch.proteins !== undefined) dbPatch.proteins = patch.proteins
+      if (patch.lipids !== undefined) dbPatch.lipids = patch.lipids
+      if (patch.carbs !== undefined) dbPatch.carbs = patch.carbs
+      if (patch.fiber !== undefined) dbPatch.fiber = patch.fiber
+
+      await supabase.from('foods').update(dbPatch).eq('id', id)
+      setFoods((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+      )
     },
     [],
   )
 
   const deleteFood = useCallback(async (id: string) => {
-    await dbDeleteFood(id)
+    await supabase.from('foods').delete().eq('id', id)
     setFoods((prev) => prev.filter((f) => f.id !== id))
   }, [])
 

@@ -1,5 +1,6 @@
-import { createContext, useContext, type ReactNode } from 'react'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import type { DailyGoal } from '@/types'
 
 interface GoalContextValue {
@@ -10,9 +11,31 @@ interface GoalContextValue {
 const GoalContext = createContext<GoalContextValue | null>(null)
 
 export function GoalProvider({ children }: { children: ReactNode }) {
-  const [goal, setGoalState] = useLocalStorage<DailyGoal>('ziadregim-goal', { kcal: 2000 })
+  const { user } = useAuth()
+  const [goal, setGoalState] = useState<DailyGoal>({ kcal: 2000 })
 
-  const setGoal = (kcal: number) => setGoalState({ kcal })
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('user_settings')
+      .select('daily_goal_kcal')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setGoalState({ kcal: data.daily_goal_kcal })
+      })
+  }, [user])
+
+  const setGoal = useCallback(
+    async (kcal: number) => {
+      setGoalState({ kcal })
+      if (!user) return
+      await supabase
+        .from('user_settings')
+        .upsert({ user_id: user.id, daily_goal_kcal: kcal }, { onConflict: 'user_id' })
+    },
+    [user],
+  )
 
   return <GoalContext.Provider value={{ goal, setGoal }}>{children}</GoalContext.Provider>
 }
