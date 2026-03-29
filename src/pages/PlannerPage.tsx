@@ -9,6 +9,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { generateDayMeals, canGenerate, computeSlotRatios } from '@/utils/mealGenerator'
+import { generateWithAI, getApiKey } from '@/utils/aiMealGenerator'
 import { todayKey, addDays, displayDate } from '@/utils/date'
 import { usePlanActions } from '@/hooks/usePlanActions'
 import { MEAL_LABELS } from '@/types'
@@ -26,7 +27,11 @@ export function PlannerPage() {
   const { goal } = useGoal()
   const { total } = useCalories(dateKey)
   const [generating, setGenerating] = useState(false)
+  const [generatingAI, setGeneratingAI] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [confirmGenerate, setConfirmGenerate] = useState(false)
+  const [confirmGenerateAI, setConfirmGenerateAI] = useState(false)
+  const hasApiKey = !!getApiKey()
 
   const plan = getOrCreatePlan(dateKey)
   const skippedMeals: MealType[] = plan.skippedMeals ?? []
@@ -61,6 +66,19 @@ export function PlannerPage() {
     await actions.replaceWithNewPlan(newPlan)
     setGenerating(false)
     setConfirmGenerate(false)
+  }
+
+  const handleGenerateAI = async () => {
+    setAiError(null)
+    setGeneratingAI(true)
+    setConfirmGenerateAI(false)
+    try {
+      const newPlan = await generateWithAI(dateKey, foods, goal.kcal, skippedMeals)
+      await actions.replaceWithNewPlan(newPlan)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Erreur inconnue')
+    }
+    setGeneratingAI(false)
   }
 
   if (loading) {
@@ -131,37 +149,63 @@ export function PlannerPage() {
         )}
       </div>
 
-      {/* Auto-generate button */}
-      <button
-        onClick={() => {
-          if (!canGenerate(foods)) return
-          hasContent ? setConfirmGenerate(true) : handleGenerate()
-        }}
-        disabled={!canGenerate(foods) || generating || activeMealCount === 0}
-        className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold transition-all border-2 border-dashed disabled:opacity-40 disabled:cursor-not-allowed border-brand-400 text-brand-700 hover:bg-brand-50 active:scale-95"
-      >
-        {generating ? (
-          <>
-            <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-            Génération en cours…
-          </>
-        ) : (
-          <>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            {canGenerate(foods)
-              ? 'Générer mes repas automatiquement'
-              : 'Ajoutez des aliments pour générer les repas'}
-          </>
-        )}
-      </button>
+      {/* Generate buttons */}
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={() => {
+            if (!canGenerate(foods)) return
+            hasContent ? setConfirmGenerate(true) : handleGenerate()
+          }}
+          disabled={!canGenerate(foods) || generating || generatingAI || activeMealCount === 0}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold transition-all border-2 border-dashed disabled:opacity-40 disabled:cursor-not-allowed border-brand-400 text-brand-700 hover:bg-brand-50 active:scale-95"
+        >
+          {generating ? (
+            <>
+              <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              Génération en cours…
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              {canGenerate(foods) ? 'Générer mes repas' : 'Ajoutez des aliments pour générer les repas'}
+            </>
+          )}
+        </button>
 
-      {!canGenerate(foods) && foods.length < 3 && (
-        <p className="text-xs text-center text-gray-400 -mt-2">
-          Ajoutez au moins 3 aliments avec du stock dans l'onglet "Aliments".
-        </p>
-      )}
+        {hasApiKey && canGenerate(foods) && activeMealCount > 0 && (
+          <button
+            onClick={() => hasContent ? setConfirmGenerateAI(true) : handleGenerateAI()}
+            disabled={generating || generatingAI}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold transition-all border-2 disabled:opacity-40 disabled:cursor-not-allowed border-purple-400 text-purple-700 bg-purple-50 hover:bg-purple-100 active:scale-95"
+          >
+            {generatingAI ? (
+              <>
+                <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                L'IA prépare vos repas…
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                Générer avec l'IA Claude
+              </>
+            )}
+          </button>
+        )}
+
+        {aiError && (
+          <p className="text-xs text-red-500 text-center px-2">{aiError}</p>
+        )}
+
+        {!canGenerate(foods) && foods.length < 3 && (
+          <p className="text-xs text-center text-gray-400">
+            Ajoutez au moins 3 aliments avec du stock dans l'onglet "Aliments".
+          </p>
+        )}
+      </div>
 
       {/* Meals */}
       {plan.meals.map((meal) => (
@@ -173,6 +217,27 @@ export function PlannerPage() {
           onToggleSkip={() => toggleSkipMeal(dateKey, meal.type)}
         />
       ))}
+
+      {/* Confirm AI overwrite modal */}
+      <Modal
+        open={confirmGenerateAI}
+        onClose={() => setConfirmGenerateAI(false)}
+        title="Générer avec l'IA ?"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-gray-600">
+            L'IA va créer des recettes personnalisées à partir de tes aliments et <strong>remplacer</strong> les repas existants.
+          </p>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setConfirmGenerateAI(false)} fullWidth>
+              Annuler
+            </Button>
+            <Button onClick={handleGenerateAI} fullWidth disabled={generatingAI} className="bg-purple-600 hover:bg-purple-700">
+              {generatingAI ? 'Génération…' : 'Générer avec l\'IA'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Confirm overwrite modal */}
       <Modal

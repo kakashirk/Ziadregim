@@ -55,9 +55,14 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
         >
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xl">{mealEmojis[meal.type]}</span>
-            <span className={`font-semibold truncate ${skipped ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-              {MEAL_LABELS[meal.type]}
-            </span>
+            <div className="min-w-0">
+              <span className={`font-semibold block truncate ${skipped ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                {MEAL_LABELS[meal.type]}
+              </span>
+              {!skipped && meal.type === 'breakfast' && meal.name && (
+                <span className="text-xs text-brand-600 font-medium truncate block">{meal.name}</span>
+              )}
+            </div>
             {skipped && <span className="text-xs text-gray-400 font-normal shrink-0">— ignoré</span>}
           </div>
           {!skipped && (

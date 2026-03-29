@@ -23,9 +23,14 @@ export function CourseBlock({ course, actions, mealType }: CourseBlockProps) {
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-between py-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-base">{courseEmojis[course.type]}</span>
-          <span className="text-sm font-semibold text-gray-700">{COURSE_LABELS[course.type]}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-base shrink-0">{courseEmojis[course.type]}</span>
+          <div className="min-w-0">
+            <span className="text-sm font-semibold text-gray-700">{COURSE_LABELS[course.type]}</span>
+            {course.name && (
+              <p className="text-xs text-brand-600 font-medium truncate">{course.name}</p>
+            )}
+          </div>
         </div>
         <button
           onClick={() => setModalOpen(true)}

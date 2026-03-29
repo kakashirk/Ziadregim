@@ -50,11 +50,13 @@ export interface MealEntry {
 
 export interface Course {
   type: CourseType
+  name?: string    // recipe name, e.g. "Poulet rôti aux légumes"
   items: MealEntry[]
 }
 
 export interface Meal {
   type: MealType
+  name?: string    // recipe name for breakfast
   items?: MealEntry[] // breakfast only
   courses?: Course[] // lunch + dinner only
 }
