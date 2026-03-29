@@ -49,6 +49,7 @@ export interface Meal {
 export interface DailyPlan {
   dateKey: string // "YYYY-MM-DD"
   meals: Meal[]
+  skippedMeals?: MealType[] // meals the user has opted out of for this day
 }
 
 // ── Goal ───────────────────────────────────────────────────────────────────

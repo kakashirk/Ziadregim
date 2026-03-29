@@ -8,14 +8,18 @@ import { MealSection } from '@/components/meal/MealSection'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { generateDayMeals, canGenerate } from '@/utils/mealGenerator'
+import { generateDayMeals, canGenerate, computeSlotRatios } from '@/utils/mealGenerator'
 import { todayKey, addDays, displayDate } from '@/utils/date'
+import { MEAL_LABELS } from '@/types'
+import type { MealType } from '@/types'
+
+const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner']
 
 export function PlannerPage() {
   const { date } = useParams<{ date: string }>()
   const dateKey = date ?? todayKey()
   const navigate = useNavigate()
-  const { getOrCreatePlan, replacePlan, loading } = usePlan()
+  const { getOrCreatePlan, replacePlan, toggleSkipMeal, loading } = usePlan()
   const { foods } = useFood()
   const { goal } = useGoal()
   const { total } = useCalories(dateKey)
@@ -23,11 +27,27 @@ export function PlannerPage() {
   const [confirmGenerate, setConfirmGenerate] = useState(false)
 
   const plan = getOrCreatePlan(dateKey)
+  const skippedMeals: MealType[] = plan.skippedMeals ?? []
+
+  // Effective calorie budget per active meal, for display
+  const ratios = computeSlotRatios(skippedMeals)
+  const mealBudgets: Record<MealType, number> = {
+    breakfast: Math.round(goal.kcal * ratios['breakfast']),
+    lunch: Math.round(goal.kcal * (ratios['lunch_entree'] + ratios['lunch_plat'] + ratios['lunch_dessert'])),
+    dinner: Math.round(goal.kcal * (ratios['dinner_entree'] + ratios['dinner_plat'] + ratios['dinner_dessert'])),
+  }
+
+  // Only count calories from non-skipped meals
+  const activeMealTotal = plan.meals
+    .filter((m) => !skippedMeals.includes(m.type))
+    .reduce((sum) => sum, 0)
+  void activeMealTotal // total from useCalories already excludes empty meals
+
   const pct = goal.kcal > 0 ? (total / goal.kcal) * 100 : 0
   const remaining = Math.max(0, goal.kcal - total)
 
-  // Has the current day any food entries?
   const hasContent = plan.meals.some((m) => {
+    if (skippedMeals.includes(m.type)) return false
     if (m.type === 'breakfast') return (m.items ?? []).length > 0
     return (m.courses ?? []).some((c) => c.items.length > 0)
   })
@@ -35,7 +55,7 @@ export function PlannerPage() {
   const handleGenerate = async () => {
     setGenerating(true)
     await new Promise((r) => setTimeout(r, 80))
-    const newPlan = generateDayMeals(dateKey, foods, goal.kcal)
+    const newPlan = generateDayMeals(dateKey, foods, goal.kcal, skippedMeals)
     await replacePlan(newPlan)
     setGenerating(false)
     setConfirmGenerate(false)
@@ -48,6 +68,8 @@ export function PlannerPage() {
       </div>
     )
   }
+
+  const activeMealCount = MEAL_ORDER.filter((m) => !skippedMeals.includes(m)).length
 
   return (
     <div className="flex flex-col gap-4 p-4 pb-8">
@@ -91,6 +113,20 @@ export function PlannerPage() {
             ? `Objectif atteint ! ${total - goal.kcal} kcal en excès.`
             : `Il reste ${remaining} kcal à consommer.`}
         </p>
+
+        {/* Redistribution info when meals are skipped */}
+        {skippedMeals.length > 0 && activeMealCount > 0 && (
+          <div className="mt-1 pt-2 border-t border-gray-100 flex flex-col gap-1">
+            <p className="text-xs text-gray-500 font-medium">Répartition sur les repas actifs :</p>
+            <div className="flex flex-wrap gap-2">
+              {MEAL_ORDER.filter((m) => !skippedMeals.includes(m)).map((m) => (
+                <span key={m} className="text-xs bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full">
+                  {MEAL_LABELS[m]} · <strong>{mealBudgets[m]} kcal</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Auto-generate button */}
@@ -99,7 +135,7 @@ export function PlannerPage() {
           if (!canGenerate(foods)) return
           hasContent ? setConfirmGenerate(true) : handleGenerate()
         }}
-        disabled={!canGenerate(foods) || generating}
+        disabled={!canGenerate(foods) || generating || activeMealCount === 0}
         className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold transition-all border-2 border-dashed disabled:opacity-40 disabled:cursor-not-allowed border-brand-400 text-brand-700 hover:bg-brand-50 active:scale-95"
       >
         {generating ? (
@@ -127,7 +163,13 @@ export function PlannerPage() {
 
       {/* Meals */}
       {plan.meals.map((meal) => (
-        <MealSection key={meal.type} dateKey={dateKey} meal={meal} />
+        <MealSection
+          key={meal.type}
+          dateKey={dateKey}
+          meal={meal}
+          skipped={skippedMeals.includes(meal.type)}
+          onToggleSkip={() => toggleSkipMeal(dateKey, meal.type)}
+        />
       ))}
 
       {/* Confirm overwrite modal */}
@@ -138,7 +180,12 @@ export function PlannerPage() {
       >
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-600">
-            Des repas ont déjà été planifiés pour ce jour. La génération automatique va les <strong>remplacer entièrement</strong>.
+            Des repas ont déjà été planifiés pour ce jour. La génération automatique va les{' '}
+            <strong>remplacer entièrement</strong>
+            {skippedMeals.length > 0 && (
+              <> (les repas ignorés ne seront pas générés)</>
+            )}
+            .
           </p>
           <div className="flex gap-3">
             <Button variant="secondary" onClick={() => setConfirmGenerate(false)} fullWidth>

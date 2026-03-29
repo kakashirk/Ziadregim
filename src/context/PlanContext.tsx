@@ -9,6 +9,7 @@ interface PlanContextValue {
   loading: boolean
   getOrCreatePlan: (dateKey: string) => DailyPlan
   replacePlan: (plan: DailyPlan) => Promise<void>
+  toggleSkipMeal: (dateKey: string, mealType: MealType) => Promise<void>
   addMealEntry: (
     dateKey: string,
     mealType: MealType,
@@ -153,6 +154,19 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     await savePlan(plan)
   }, [savePlan])
 
+  const toggleSkipMeal = useCallback(
+    async (dateKey: string, mealType: MealType) => {
+      await mutatePlan(dateKey, (plan) => {
+        const skipped = plan.skippedMeals ?? []
+        plan.skippedMeals = skipped.includes(mealType)
+          ? skipped.filter((m) => m !== mealType)
+          : [...skipped, mealType]
+        return plan
+      })
+    },
+    [mutatePlan],
+  )
+
   return (
     <PlanContext.Provider
       value={{
@@ -160,6 +174,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
         loading,
         getOrCreatePlan,
         replacePlan,
+        toggleSkipMeal,
         addMealEntry,
         removeMealEntry,
         updateMealEntryQty,
