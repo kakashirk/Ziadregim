@@ -93,12 +93,12 @@ export function AdminPage() {
   }
 
   const makeAdmin = async (profile: Profile) => {
-    const { error } = await supabase.rpc('set_user_role', { target_user_id: profile.id, new_role: 'admin' })
+    const { error } = await supabase.rpc('set_user_admin', { target_user_id: profile.id, make_admin: true })
     if (!error) setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, role: 'admin' } : p))
   }
 
   const removeAdmin = async (profile: Profile) => {
-    const { error } = await supabase.rpc('set_user_role', { target_user_id: profile.id, new_role: 'user' })
+    const { error } = await supabase.rpc('set_user_admin', { target_user_id: profile.id, make_admin: false })
     if (!error) setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, role: 'user' } : p))
   }
 
