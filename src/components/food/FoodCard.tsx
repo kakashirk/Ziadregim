@@ -15,11 +15,14 @@ export function FoodCard({ food }: FoodCardProps) {
   const { updateFood, deleteFood } = useFood()
   const [editOpen, setEditOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [macroOpen, setMacroOpen] = useState(false)
 
   const stockLabel =
     food.unit === 'g'
       ? `${food.quantityInStock} g`
       : `${food.quantityInStock} unité${food.quantityInStock > 1 ? 's' : ''}`
+
+  const hasMacros = food.proteins || food.lipids || food.carbs || food.fiber
 
   return (
     <>
@@ -64,6 +67,34 @@ export function FoodCard({ food }: FoodCardProps) {
 
         {food.unit === 'unit' && food.gramsPerUnit && (
           <p className="text-xs text-gray-400">{food.gramsPerUnit}g / unité</p>
+        )}
+
+        {hasMacros && (
+          <button
+            onClick={() => setMacroOpen((v) => !v)}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-brand-600 transition-colors self-start"
+          >
+            <svg className={`w-3 h-3 transition-transform ${macroOpen ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            Macros
+          </button>
+        )}
+
+        {macroOpen && hasMacros && (
+          <div className="grid grid-cols-4 gap-1.5 pt-1">
+            {([
+              ['P', food.proteins, 'text-blue-600', 'bg-blue-50'],
+              ['G', food.carbs,    'text-orange-600','bg-orange-50'],
+              ['L', food.lipids,   'text-yellow-600','bg-yellow-50'],
+              ['F', food.fiber,    'text-green-600', 'bg-green-50'],
+            ] as [string, number | undefined, string, string][]).map(([label, val, textCls, bgCls]) => (
+              <div key={label} className={`${bgCls} rounded-lg px-2 py-1.5 text-center`}>
+                <p className={`text-xs font-bold ${textCls}`}>{label}</p>
+                <p className="text-xs text-gray-700">{val ?? '—'}g</p>
+              </div>
+            ))}
+          </div>
         )}
       </Card>
 

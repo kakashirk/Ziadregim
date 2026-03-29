@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/Card'
 import { MealItem } from './MealItem'
 import { CourseBlock } from './CourseBlock'
 import { AddMealItemModal } from './AddMealItemModal'
-import { usePlan } from '@/context/PlanContext'
+import { usePlanActions } from '@/hooks/usePlanActions'
 import { useFood } from '@/context/FoodContext'
 import { mealKcal } from '@/utils/calories'
 import { MEAL_LABELS } from '@/types'
@@ -23,16 +23,12 @@ interface MealSectionProps {
 }
 
 export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectionProps) {
-  const { addMealEntry, removeMealEntry, updateMealEntryQty } = usePlan()
+  const actions = usePlanActions(dateKey)
   const { foods } = useFood()
   const [modalOpen, setModalOpen] = useState(false)
   const [expanded, setExpanded] = useState(true)
 
   const kcal = mealKcal(meal, foods)
-
-  const handleAdd = async (foodId: string, quantity: number) => {
-    await addMealEntry(dateKey, meal.type, null, { foodId, quantity })
-  }
 
   return (
     <Card className={`overflow-hidden transition-opacity ${skipped ? 'opacity-50' : ''}`}>
@@ -42,12 +38,9 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
         <button
           onClick={(e) => { e.stopPropagation(); onToggleSkip() }}
           className={`shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-            skipped
-              ? 'border-gray-300 bg-gray-100'
-              : 'border-brand-500 bg-brand-500'
+            skipped ? 'border-gray-300 bg-gray-100' : 'border-brand-500 bg-brand-500'
           }`}
           aria-label={skipped ? 'Inclure ce repas' : 'Passer ce repas'}
-          title={skipped ? 'Cliquer pour inclure ce repas' : 'Cliquer pour passer ce repas'}
         >
           {!skipped && (
             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -56,7 +49,6 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
           )}
         </button>
 
-        {/* Title — clicking expands/collapses */}
         <button
           className="flex-1 flex items-center justify-between min-w-0"
           onClick={() => !skipped && setExpanded((v) => !v)}
@@ -66,18 +58,14 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
             <span className={`font-semibold truncate ${skipped ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
               {MEAL_LABELS[meal.type]}
             </span>
-            {skipped && (
-              <span className="text-xs text-gray-400 font-normal shrink-0">— ignoré</span>
-            )}
+            {skipped && <span className="text-xs text-gray-400 font-normal shrink-0">— ignoré</span>}
           </div>
           {!skipped && (
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-sm font-bold text-brand-600">{kcal} kcal</span>
               <svg
                 className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -86,7 +74,7 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
         </button>
       </div>
 
-      {/* Body — hidden when skipped */}
+      {/* Body */}
       {!skipped && expanded && (
         <div className="px-4 pb-4 border-t border-gray-50">
           {meal.type === 'breakfast' ? (
@@ -99,8 +87,8 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
                     <MealItem
                       key={entry.id}
                       entry={entry}
-                      onRemove={() => removeMealEntry(dateKey, meal.type, null, entry.id)}
-                      onUpdateQty={(qty) => updateMealEntryQty(dateKey, meal.type, null, entry.id, qty)}
+                      onRemove={() => actions.remove(meal.type, null, entry.id)}
+                      onUpdateQty={(qty) => actions.updateQty(meal.type, null, entry.id, qty)}
                     />
                   ))
                 )}
@@ -117,7 +105,7 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
               <AddMealItemModal
                 open={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onAdd={handleAdd}
+                onAdd={(foodId, qty) => actions.add(meal.type, null, foodId, qty)}
                 title="Ajouter au petit-déjeuner"
               />
             </>
@@ -126,16 +114,9 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
               {(meal.courses ?? []).map((course) => (
                 <CourseBlock
                   key={course.type}
-                  dateKey={dateKey}
-                  mealType={meal.type}
                   course={course}
-                  onAdd={(foodId, quantity) =>
-                    addMealEntry(dateKey, meal.type, course.type, { foodId, quantity })
-                  }
-                  onRemove={(entryId) => removeMealEntry(dateKey, meal.type, course.type, entryId)}
-                  onUpdateQty={(entryId, qty) =>
-                    updateMealEntryQty(dateKey, meal.type, course.type, entryId, qty)
-                  }
+                  mealType={meal.type}
+                  actions={actions}
                 />
               ))}
             </div>

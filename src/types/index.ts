@@ -8,6 +8,20 @@ export interface FoodItem {
   quantityInStock: number
   category?: string
   createdAt: string
+  // Macronutrients per 100g (optional, shown on dashboard)
+  proteins?: number
+  lipids?: number
+  carbs?: number
+  fiber?: number
+}
+
+// ── Macros ──────────────────────────────────────────────────────────────────
+export interface Macros {
+  kcal: number
+  proteins: number
+  lipids: number
+  carbs: number
+  fiber: number
 }
 
 // ── Meal Structure ──────────────────────────────────────────────────────────
