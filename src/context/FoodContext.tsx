@@ -6,6 +6,7 @@ import type { FoodItem } from '@/types'
 interface FoodContextValue {
   foods: FoodItem[]
   loading: boolean
+  dbError: string | null
   addFood: (data: Omit<FoodItem, 'id' | 'createdAt'>) => Promise<void>
   updateFood: (id: string, patch: Partial<Omit<FoodItem, 'id' | 'createdAt'>>) => Promise<void>
   deleteFood: (id: string) => Promise<void>
@@ -35,22 +36,27 @@ export function FoodProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [foods, setFoods] = useState<FoodItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) { setFoods([]); setLoading(false); return }
     setLoading(true)
+    setDbError(null)
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 6000)
     ;(async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('foods')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: true })
           .abortSignal(controller.signal)
-        setFoods((data ?? []).map(rowToFoodItem))
-      } catch { /* ignore */ }
+        if (error) setDbError(error.message)
+        else setFoods((data ?? []).map(rowToFoodItem))
+      } catch (e) {
+        setDbError(e instanceof Error ? e.message : 'Erreur inconnue')
+      }
       clearTimeout(timer)
       setLoading(false)
     })()
@@ -109,8 +115,8 @@ export function FoodProvider({ children }: { children: ReactNode }) {
   const getFoodById = useCallback((id: string) => foods.find((f) => f.id === id), [foods])
 
   const value = useMemo(
-    () => ({ foods, loading, addFood, updateFood, deleteFood, getFoodById }),
-    [foods, loading, addFood, updateFood, deleteFood, getFoodById],
+    () => ({ foods, loading, dbError, addFood, updateFood, deleteFood, getFoodById }),
+    [foods, loading, dbError, addFood, updateFood, deleteFood, getFoodById],
   )
   return <FoodContext.Provider value={value}>{children}</FoodContext.Provider>
 }

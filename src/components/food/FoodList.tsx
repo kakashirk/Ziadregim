@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
 
 export function FoodList() {
-  const { foods, loading } = useFood()
+  const { foods, loading, dbError } = useFood()
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
@@ -22,6 +22,14 @@ export function FoodList() {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (dbError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs text-red-700 font-mono break-all">
+        Erreur DB : {dbError}
       </div>
     )
   }
