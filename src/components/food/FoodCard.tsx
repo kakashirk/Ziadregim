@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { FoodForm } from './FoodForm'
 import { useFood } from '@/context/FoodContext'
+import { FOOD_DATABASE } from '@/data/foodDatabase'
 import type { FoodItem } from '@/types'
 
 interface FoodCardProps {
@@ -100,14 +101,24 @@ export function FoodCard({ food }: FoodCardProps) {
 
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title={`Modifier — ${food.name}`}>
         <FoodForm
-          initial={{
-            name: food.name,
-            caloriesPer100g: food.caloriesPer100g,
-            unit: food.unit,
-            gramsPerUnit: food.gramsPerUnit,
-            quantityInStock: food.quantityInStock,
-            category: food.category,
-          }}
+          initial={(() => {
+            // Look up macros from DB if not stored on the food item
+            const dbEntry = (food.proteins == null && food.lipids == null && food.carbs == null && food.fiber == null)
+              ? FOOD_DATABASE.find((f) => f.name.toLowerCase() === food.name.toLowerCase())
+              : null
+            return {
+              name: food.name,
+              caloriesPer100g: food.caloriesPer100g,
+              unit: food.unit,
+              gramsPerUnit: food.gramsPerUnit,
+              quantityInStock: food.quantityInStock,
+              category: food.category,
+              proteins: food.proteins ?? dbEntry?.proteins,
+              lipids: food.lipids ?? dbEntry?.lipids,
+              carbs: food.carbs ?? dbEntry?.carbs,
+              fiber: food.fiber ?? dbEntry?.fiber,
+            }
+          })()}
           onSubmit={async (data) => {
             await updateFood(food.id, data)
             setEditOpen(false)
