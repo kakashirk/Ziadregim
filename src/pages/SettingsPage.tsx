@@ -19,7 +19,7 @@ export function SettingsPage() {
 
   const { foods } = useFood()
   const { plans } = usePlan()
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin } = useAuth()
 
   const handleSaveGoal = () => {
     const n = Number(kcalInput)
@@ -93,32 +93,35 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      {/* Reset */}
-      <Card className="p-4 flex flex-col gap-3 border-red-100">
-        <h2 className="text-sm font-semibold text-red-700">Zone de danger</h2>
-        <p className="text-xs text-gray-500">
-          Effacer toutes les données supprimera définitivement vos aliments et vos plans de repas.
-        </p>
-        <Button variant="danger" size="sm" onClick={() => setConfirmReset(true)}>
-          Effacer toutes les données
-        </Button>
-      </Card>
+      {isAdmin && (
+        <>
+          <Card className="p-4 flex flex-col gap-3 border-red-100">
+            <h2 className="text-sm font-semibold text-red-700">Zone de danger</h2>
+            <p className="text-xs text-gray-500">
+              Effacer toutes les données supprimera définitivement vos aliments et vos plans de repas.
+            </p>
+            <Button variant="danger" size="sm" onClick={() => setConfirmReset(true)}>
+              Effacer toutes les données
+            </Button>
+          </Card>
 
-      <Modal open={confirmReset} onClose={() => setConfirmReset(false)} title="Tout effacer ?">
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-gray-600">
-            Cette action est <strong>irréversible</strong>. Tous vos aliments et plans de repas seront supprimés.
-          </p>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => setConfirmReset(false)} fullWidth>
-              Annuler
-            </Button>
-            <Button variant="danger" onClick={handleReset} fullWidth>
-              Tout supprimer
-            </Button>
-          </div>
-        </div>
-      </Modal>
+          <Modal open={confirmReset} onClose={() => setConfirmReset(false)} title="Tout effacer ?">
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-gray-600">
+                Cette action est <strong>irréversible</strong>. Tous vos aliments et plans de repas seront supprimés.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="secondary" onClick={() => setConfirmReset(false)} fullWidth>
+                  Annuler
+                </Button>
+                <Button variant="danger" onClick={handleReset} fullWidth>
+                  Tout supprimer
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        </>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
@@ -32,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const sessionIdRef = useRef<string | null>(null)
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -49,10 +50,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session)
       if (session?.user) fetchProfile(session.user.id)
       else setProfile(null)
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        const { data } = await supabase
+          .from('user_sessions')
+          .insert({ user_id: session.user.id })
+          .select('id')
+          .single()
+        if (data) sessionIdRef.current = (data as { id: string }).id
+      }
+
+      if (event === 'SIGNED_OUT' && sessionIdRef.current) {
+        await supabase
+          .from('user_sessions')
+          .update({ logged_out_at: new Date().toISOString() })
+          .eq('id', sessionIdRef.current)
+        sessionIdRef.current = null
+      }
     })
 
     return () => subscription.unsubscribe()
