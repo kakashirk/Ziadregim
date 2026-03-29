@@ -39,6 +39,8 @@ export function FoodProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) { setFoods([]); setLoading(false); return }
     setLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 6000)
     ;(async () => {
       try {
         const { data } = await supabase
@@ -46,10 +48,13 @@ export function FoodProvider({ children }: { children: ReactNode }) {
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: true })
+          .abortSignal(controller.signal)
         setFoods((data ?? []).map(rowToFoodItem))
       } catch { /* ignore */ }
+      clearTimeout(timer)
       setLoading(false)
     })()
+    return () => controller.abort()
   }, [user])
 
   const addFood = useCallback(async (data: Omit<FoodItem, 'id' | 'createdAt'>) => {
