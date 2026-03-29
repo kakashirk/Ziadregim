@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { MealItem } from './MealItem'
 import { CourseBlock } from './CourseBlock'
@@ -22,7 +22,7 @@ interface MealSectionProps {
   onToggleSkip: () => void
 }
 
-export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectionProps) {
+export const MealSection = memo(function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectionProps) {
   const actions = usePlanActions(dateKey)
   const { foods } = useFood()
   const [modalOpen, setModalOpen] = useState(false)
@@ -130,4 +130,4 @@ export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectio
       )}
     </Card>
   )
-}
+})

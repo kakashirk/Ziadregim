@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import type { DailyGoal } from '@/types'
@@ -37,7 +37,8 @@ export function GoalProvider({ children }: { children: ReactNode }) {
     [user],
   )
 
-  return <GoalContext.Provider value={{ goal, setGoal }}>{children}</GoalContext.Provider>
+  const value = useMemo(() => ({ goal, setGoal }), [goal, setGoal])
+  return <GoalContext.Provider value={value}>{children}</GoalContext.Provider>
 }
 
 export function useGoal() {

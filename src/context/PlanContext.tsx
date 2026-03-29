@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -33,6 +33,22 @@ interface PlanContextValue {
 }
 
 const PlanContext = createContext<PlanContextValue | null>(null)
+
+/** Efficient deep clone of a DailyPlan — avoids JSON.parse/stringify overhead */
+function clonePlan(plan: DailyPlan): DailyPlan {
+  return {
+    ...plan,
+    skippedMeals: plan.skippedMeals ? [...plan.skippedMeals] : undefined,
+    meals: plan.meals.map((meal) => ({
+      ...meal,
+      items: meal.items ? meal.items.map((e) => ({ ...e })) : undefined,
+      courses: meal.courses?.map((course) => ({
+        ...course,
+        items: course.items.map((e) => ({ ...e })),
+      })),
+    })),
+  }
+}
 
 function createEmptyPlan(dateKey: string): DailyPlan {
   const meals: Meal[] = [
@@ -95,7 +111,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   const mutatePlan = useCallback(
     async (dateKey: string, mutate: (plan: DailyPlan) => DailyPlan) => {
       const current = plans[dateKey] ?? createEmptyPlan(dateKey)
-      const updated = mutate(JSON.parse(JSON.stringify(current)) as DailyPlan)
+      const updated = mutate(clonePlan(current))
       await savePlan(updated)
     },
     [plans, savePlan],
@@ -161,11 +177,12 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     [mutatePlan],
   )
 
-  return (
-    <PlanContext.Provider value={{ plans, loading, getOrCreatePlan, replacePlan, toggleSkipMeal, addMealEntry, removeMealEntry, updateMealEntryQty }}>
-      {children}
-    </PlanContext.Provider>
+  const value = useMemo(
+    () => ({ plans, loading, getOrCreatePlan, replacePlan, toggleSkipMeal, addMealEntry, removeMealEntry, updateMealEntryQty }),
+    [plans, loading, getOrCreatePlan, replacePlan, toggleSkipMeal, addMealEntry, removeMealEntry, updateMealEntryQty],
   )
+
+  return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
 }
 
 export function usePlan() {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { MealItem } from './MealItem'
 import { AddMealItemModal } from './AddMealItemModal'
 import { COURSE_LABELS } from '@/types'
@@ -17,7 +17,7 @@ interface CourseBlockProps {
   mealType: MealType
 }
 
-export function CourseBlock({ course, actions, mealType }: CourseBlockProps) {
+export const CourseBlock = memo(function CourseBlock({ course, actions, mealType }: CourseBlockProps) {
   const [modalOpen, setModalOpen] = useState(false)
 
   return (
@@ -66,4 +66,4 @@ export function CourseBlock({ course, actions, mealType }: CourseBlockProps) {
       />
     </div>
   )
-}
+})
