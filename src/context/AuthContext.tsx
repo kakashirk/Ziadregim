@@ -35,20 +35,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionIdRef = useRef<string | null>(null)
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    if (data) setProfile(data as Profile)
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      if (data) setProfile(data as Profile)
+    } catch {
+      // silently ignore — ne bloque pas le chargement
+    }
   }
 
   useEffect(() => {
+    // Safety timeout — évite le chargement infini si Supabase ne répond pas
+    const timeout = setTimeout(() => setLoading(false), 5000)
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session?.user) fetchProfile(session.user.id).finally(() => setLoading(false))
-      else setLoading(false)
-    })
+      if (session?.user) fetchProfile(session.user.id).finally(() => { clearTimeout(timeout); setLoading(false) })
+      else { clearTimeout(timeout); setLoading(false) }
+    }).catch(() => { clearTimeout(timeout); setLoading(false) })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session)
