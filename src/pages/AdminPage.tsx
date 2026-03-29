@@ -72,12 +72,16 @@ export function AdminPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [{ data: prof }, { data: tok }] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-      supabase.from('invite_tokens').select('*').order('created_at', { ascending: false }),
-    ])
-    setProfiles((prof ?? []) as Profile[])
-    setTokens((tok ?? []) as InviteToken[])
+    try {
+      const [{ data: prof }, { data: tok }] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('invite_tokens').select('*').order('created_at', { ascending: false }),
+      ])
+      setProfiles((prof ?? []) as Profile[])
+      setTokens((tok ?? []) as InviteToken[])
+    } catch {
+      // silently ignore — affiche liste vide
+    }
     setLoading(false)
   }, [])
 
