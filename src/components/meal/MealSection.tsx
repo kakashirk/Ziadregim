@@ -18,9 +18,11 @@ const mealEmojis: Record<MealType, string> = {
 interface MealSectionProps {
   dateKey: string
   meal: Meal
+  skipped: boolean
+  onToggleSkip: () => void
 }
 
-export function MealSection({ dateKey, meal }: MealSectionProps) {
+export function MealSection({ dateKey, meal, skipped, onToggleSkip }: MealSectionProps) {
   const { addMealEntry, removeMealEntry, updateMealEntryQty } = usePlan()
   const { foods } = useFood()
   const [modalOpen, setModalOpen] = useState(false)
@@ -33,31 +35,59 @@ export function MealSection({ dateKey, meal }: MealSectionProps) {
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={`overflow-hidden transition-opacity ${skipped ? 'opacity-50' : ''}`}>
       {/* Header */}
-      <button
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{mealEmojis[meal.type]}</span>
-          <span className="font-semibold text-gray-900">{MEAL_LABELS[meal.type]}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-brand-600">{kcal} kcal</span>
-          <svg
-            className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
+      <div className="flex items-center px-4 py-3 gap-2">
+        {/* Skip toggle */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleSkip() }}
+          className={`shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+            skipped
+              ? 'border-gray-300 bg-gray-100'
+              : 'border-brand-500 bg-brand-500'
+          }`}
+          aria-label={skipped ? 'Inclure ce repas' : 'Passer ce repas'}
+          title={skipped ? 'Cliquer pour inclure ce repas' : 'Cliquer pour passer ce repas'}
+        >
+          {!skipped && (
+            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
 
-      {/* Body */}
-      {expanded && (
+        {/* Title — clicking expands/collapses */}
+        <button
+          className="flex-1 flex items-center justify-between min-w-0"
+          onClick={() => !skipped && setExpanded((v) => !v)}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xl">{mealEmojis[meal.type]}</span>
+            <span className={`font-semibold truncate ${skipped ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+              {MEAL_LABELS[meal.type]}
+            </span>
+            {skipped && (
+              <span className="text-xs text-gray-400 font-normal shrink-0">— ignoré</span>
+            )}
+          </div>
+          {!skipped && (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm font-bold text-brand-600">{kcal} kcal</span>
+              <svg
+                className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          )}
+        </button>
+      </div>
+
+      {/* Body — hidden when skipped */}
+      {!skipped && expanded && (
         <div className="px-4 pb-4 border-t border-gray-50">
           {meal.type === 'breakfast' ? (
             <>

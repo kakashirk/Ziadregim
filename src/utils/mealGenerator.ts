@@ -1,28 +1,50 @@
 import { v4 as uuidv4 } from 'uuid'
-import type { FoodItem, DailyPlan, MealEntry, Meal } from '@/types'
+import type { FoodItem, DailyPlan, MealEntry, Meal, MealType } from '@/types'
 import { MEAL_COURSES } from '@/types'
 import type { MealRole } from '@/data/foodDatabase'
 import { FOOD_DATABASE } from '@/data/foodDatabase'
 
 /**
- * For each slot we target a calorie budget.
- * The algo:
- *  1. Filter inventory foods whose name matches a known DB entry (same name) to get the MealRole.
- *     For foods not found in DB, fall back to category-based role mapping.
- *  2. For each slot pick 1-2 foods that fit the role and have stock.
- *  3. Calculate quantity so the kcal contribution fills the slot budget.
- *  4. Cap quantity at available stock.
+ * Base distribution of daily calories per slot.
+ * When meals are skipped their share is redistributed proportionally
+ * among the remaining active slots.
  */
-
-// Distribution of daily calories per slot (must sum to ~1)
-const SLOT_RATIOS: Record<string, number> = {
-  breakfast: 0.22,
-  lunch_entree: 0.08,
-  lunch_plat: 0.25,
+const BASE_SLOT_RATIOS: Record<string, number> = {
+  breakfast:     0.22,
+  lunch_entree:  0.08,
+  lunch_plat:    0.25,
   lunch_dessert: 0.07,
   dinner_entree: 0.08,
-  dinner_plat: 0.22,
-  dinner_dessert: 0.08,
+  dinner_plat:   0.22,
+  dinner_dessert:0.08,
+}
+
+// Which slots belong to each meal
+const MEAL_SLOTS: Record<MealType, string[]> = {
+  breakfast: ['breakfast'],
+  lunch:     ['lunch_entree', 'lunch_plat', 'lunch_dessert'],
+  dinner:    ['dinner_entree', 'dinner_plat', 'dinner_dessert'],
+}
+
+/**
+ * Compute effective slot ratios after removing skipped meals.
+ * The freed ratio is redistributed proportionally to remaining active slots.
+ */
+export function computeSlotRatios(skippedMeals: MealType[]): Record<string, number> {
+  const skippedSlots = new Set(skippedMeals.flatMap((m) => MEAL_SLOTS[m]))
+
+  // Sum of active ratios
+  const activeTotal = Object.entries(BASE_SLOT_RATIOS)
+    .filter(([slot]) => !skippedSlots.has(slot))
+    .reduce((sum, [, r]) => sum + r, 0)
+
+  if (activeTotal === 0) return BASE_SLOT_RATIOS // fallback: nothing skipped
+
+  const result: Record<string, number> = {}
+  for (const [slot, baseRatio] of Object.entries(BASE_SLOT_RATIOS)) {
+    result[slot] = skippedSlots.has(slot) ? 0 : baseRatio / activeTotal
+  }
+  return result
 }
 
 // Fallback role inference from category
@@ -45,11 +67,6 @@ function getRoles(food: FoodItem): MealRole[] {
   return dbEntry ? dbEntry.mealRole : inferRoles(food)
 }
 
-/**
- * Given a target kcal budget and a food item,
- * return the quantity (g or units) needed to fill that budget.
- * Capped at available stock.
- */
 function quantityForKcal(targetKcal: number, food: FoodItem): number {
   if (food.unit === 'unit') {
     const kcalPerUnit = (food.caloriesPer100g / 100) * (food.gramsPerUnit ?? 100)
@@ -57,11 +74,8 @@ function quantityForKcal(targetKcal: number, food: FoodItem): number {
     const units = Math.round(targetKcal / kcalPerUnit)
     return Math.min(Math.max(1, units), food.quantityInStock)
   }
-  // grams
   const grams = Math.round((targetKcal / food.caloriesPer100g) * 100)
-  const minGrams = 20 // at least 20g
-  const maxGrams = food.quantityInStock
-  return Math.min(Math.max(minGrams, grams), maxGrams)
+  return Math.min(Math.max(20, grams), food.quantityInStock)
 }
 
 function actualKcal(food: FoodItem, quantity: number): number {
@@ -71,14 +85,14 @@ function actualKcal(food: FoodItem, quantity: number): number {
   return Math.round((quantity / 100) * food.caloriesPer100g)
 }
 
-/** Pick foods for a single slot */
 function pickFoodsForSlot(
   slot: MealRole,
   foods: FoodItem[],
   targetKcal: number,
-  used: Set<string>, // foodIds already used today
+  used: Set<string>,
 ): MealEntry[] {
-  // Foods available for this slot with stock
+  if (targetKcal <= 0) return []
+
   const candidates = foods.filter((f) => {
     if (f.quantityInStock <= 0) return false
     const roles = getRoles(f)
@@ -87,14 +101,10 @@ function pickFoodsForSlot(
 
   if (candidates.length === 0) return []
 
-  // Prefer foods not already used today
   const fresh = candidates.filter((f) => !used.has(f.id))
   const pool = fresh.length > 0 ? fresh : candidates
-
-  // Shuffle for variety
   const shuffled = [...pool].sort(() => Math.random() - 0.5)
 
-  // Pick the main food (largest calorie contributor)
   const main = shuffled[0]
   const mainQty = quantityForKcal(targetKcal * 0.8, main)
   const mainKcal = actualKcal(main, mainQty)
@@ -102,7 +112,6 @@ function pickFoodsForSlot(
 
   const entries: MealEntry[] = [{ id: uuidv4(), foodId: main.id, quantity: mainQty }]
 
-  // Optionally add a second food for the remaining budget
   const remaining = targetKcal - mainKcal
   if (remaining > 30 && shuffled.length > 1) {
     const secondary = shuffled.find((f) => !used.has(f.id))
@@ -122,41 +131,38 @@ export function generateDayMeals(
   dateKey: string,
   foods: FoodItem[],
   goalKcal: number,
+  skippedMeals: MealType[] = [],
 ): DailyPlan {
   const used = new Set<string>()
+  const ratios = computeSlotRatios(skippedMeals)
 
-  // Helper: build entries for a slot
   const entriesFor = (slot: MealRole): MealEntry[] =>
-    pickFoodsForSlot(slot, foods, goalKcal * SLOT_RATIOS[slot], used)
+    pickFoodsForSlot(slot, foods, goalKcal * ratios[slot], used)
 
   const meals: Meal[] = [
-    // Breakfast
     {
       type: 'breakfast',
-      items: entriesFor('breakfast'),
+      items: skippedMeals.includes('breakfast') ? [] : entriesFor('breakfast'),
     },
-    // Lunch
     {
       type: 'lunch',
       courses: MEAL_COURSES.map((courseType) => ({
         type: courseType,
-        items: entriesFor(`lunch_${courseType}` as MealRole),
+        items: skippedMeals.includes('lunch') ? [] : entriesFor(`lunch_${courseType}` as MealRole),
       })),
     },
-    // Dinner
     {
       type: 'dinner',
       courses: MEAL_COURSES.map((courseType) => ({
         type: courseType,
-        items: entriesFor(`dinner_${courseType}` as MealRole),
+        items: skippedMeals.includes('dinner') ? [] : entriesFor(`dinner_${courseType}` as MealRole),
       })),
     },
   ]
 
-  return { dateKey, meals }
+  return { dateKey, meals, skippedMeals }
 }
 
-/** Check if inventory has enough foods to generate a plan */
 export function canGenerate(foods: FoodItem[]): boolean {
   return foods.filter((f) => f.quantityInStock > 0).length >= 3
 }
