@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCalories } from '@/hooks/useCalories'
 import { useGoal } from '@/context/GoalContext'
@@ -26,27 +27,28 @@ export function DashboardPage() {
   const { getOrCreatePlan } = usePlan()
 
   const plan = getOrCreatePlan(dateKey)
-  const macros = dailyMacros(plan, foods)
 
+  const macros = useMemo(() => dailyMacros(plan, foods), [plan, foods])
   const pct = goal.kcal > 0 ? (total / goal.kcal) * 100 : 0
   const remaining = Math.max(0, goal.kcal - total)
 
-  // 7-day history
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(dateKey, i - 6))
-  const weekPlans = weekDays.map((d) => getOrCreatePlan(d))
-  const weekKcal = weekPlans.map((p) => dailyKcal(p, foods))
-  const weekMacros = weekPlans.map((p) => dailyMacros(p, foods))
-  const maxKcal = Math.max(goal.kcal, ...weekKcal, 1)
-
-  // Weekly averages
-  const activeDays = weekKcal.filter((k) => k > 0).length || 1
-  const avgKcal = Math.round(weekKcal.reduce((a, b) => a + b, 0) / activeDays)
-  const avgMacros = {
-    proteins: Math.round((weekMacros.reduce((a, m) => a + m.proteins, 0) / activeDays) * 10) / 10,
-    lipids:   Math.round((weekMacros.reduce((a, m) => a + m.lipids,   0) / activeDays) * 10) / 10,
-    carbs:    Math.round((weekMacros.reduce((a, m) => a + m.carbs,    0) / activeDays) * 10) / 10,
-    fiber:    Math.round((weekMacros.reduce((a, m) => a + m.fiber,    0) / activeDays) * 10) / 10,
-  }
+  // 7-day history — memoized to avoid recalculating 7 plans × N foods every render
+  const { weekDays, weekKcal, weekMacros, maxKcal, avgKcal, avgMacros } = useMemo(() => {
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(dateKey, i - 6))
+    const weekPlans = weekDays.map((d) => getOrCreatePlan(d))
+    const weekKcal = weekPlans.map((p) => dailyKcal(p, foods))
+    const weekMacros = weekPlans.map((p) => dailyMacros(p, foods))
+    const maxKcal = Math.max(goal.kcal, ...weekKcal, 1)
+    const activeDays = weekKcal.filter((k) => k > 0).length || 1
+    const avgKcal = Math.round(weekKcal.reduce((a, b) => a + b, 0) / activeDays)
+    const avgMacros = {
+      proteins: Math.round((weekMacros.reduce((a, m) => a + m.proteins, 0) / activeDays) * 10) / 10,
+      lipids:   Math.round((weekMacros.reduce((a, m) => a + m.lipids,   0) / activeDays) * 10) / 10,
+      carbs:    Math.round((weekMacros.reduce((a, m) => a + m.carbs,    0) / activeDays) * 10) / 10,
+      fiber:    Math.round((weekMacros.reduce((a, m) => a + m.fiber,    0) / activeDays) * 10) / 10,
+    }
+    return { weekDays, weekKcal, weekMacros, maxKcal, avgKcal, avgMacros }
+  }, [dateKey, getOrCreatePlan, foods, goal.kcal])
 
   return (
     <div className="flex flex-col gap-4 p-4 pb-8">

@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useFood } from '@/context/FoodContext'
-import { entryKcal } from '@/utils/calories'
 import type { MealEntry } from '@/types'
 
 interface MealItemProps {
@@ -9,15 +8,18 @@ interface MealItemProps {
   onUpdateQty: (qty: number) => void
 }
 
-export function MealItem({ entry, onRemove, onUpdateQty }: MealItemProps) {
-  const { getFoodById, foods } = useFood()
+export const MealItem = memo(function MealItem({ entry, onRemove, onUpdateQty }: MealItemProps) {
+  const { getFoodById } = useFood()
   const food = getFoodById(entry.foodId)
   const [editing, setEditing] = useState(false)
   const [qty, setQty] = useState(entry.quantity)
 
   if (!food) return null
 
-  const kcal = entryKcal(entry, foods)
+  // Compute kcal from already-resolved food — avoids a second foods.find() call
+  const kcal = food.unit === 'unit'
+    ? Math.round(((food.gramsPerUnit ?? 100) * entry.quantity / 100) * food.caloriesPer100g)
+    : Math.round((entry.quantity / 100) * food.caloriesPer100g)
   const unitLabel = food.unit === 'unit' ? (entry.quantity > 1 ? 'unités' : 'unité') : 'g'
 
   const commitEdit = () => {
@@ -72,4 +74,4 @@ export function MealItem({ entry, onRemove, onUpdateQty }: MealItemProps) {
       </button>
     </div>
   )
-}
+})

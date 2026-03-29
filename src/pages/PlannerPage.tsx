@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePlan } from '@/context/PlanContext'
 import { useFood } from '@/context/FoodContext'
@@ -36,13 +36,12 @@ export function PlannerPage() {
   const plan = getOrCreatePlan(dateKey)
   const skippedMeals: MealType[] = plan.skippedMeals ?? []
 
-  // Effective calorie budget per active meal, for display
-  const ratios = computeSlotRatios(skippedMeals)
-  const mealBudgets: Record<MealType, number> = {
+  const ratios = useMemo(() => computeSlotRatios(skippedMeals), [skippedMeals])
+  const mealBudgets = useMemo<Record<MealType, number>>(() => ({
     breakfast: Math.round(goal.kcal * ratios['breakfast']),
     lunch: Math.round(goal.kcal * (ratios['lunch_entree'] + ratios['lunch_plat'] + ratios['lunch_dessert'])),
     dinner: Math.round(goal.kcal * (ratios['dinner_entree'] + ratios['dinner_plat'] + ratios['dinner_dessert'])),
-  }
+  }), [goal.kcal, ratios])
 
   // Only count calories from non-skipped meals
   const activeMealTotal = plan.meals

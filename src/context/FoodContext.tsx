@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import type { FoodItem } from '@/types'
@@ -101,11 +101,11 @@ export function FoodProvider({ children }: { children: ReactNode }) {
 
   const getFoodById = useCallback((id: string) => foods.find((f) => f.id === id), [foods])
 
-  return (
-    <FoodContext.Provider value={{ foods, loading, addFood, updateFood, deleteFood, getFoodById }}>
-      {children}
-    </FoodContext.Provider>
+  const value = useMemo(
+    () => ({ foods, loading, addFood, updateFood, deleteFood, getFoodById }),
+    [foods, loading, addFood, updateFood, deleteFood, getFoodById],
   )
+  return <FoodContext.Provider value={value}>{children}</FoodContext.Provider>
 }
 
 export function useFood() {
