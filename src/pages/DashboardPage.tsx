@@ -33,7 +33,7 @@ export function DashboardPage() {
   const remaining = Math.max(0, goal.kcal - total)
 
   // 7-day history — memoized to avoid recalculating 7 plans × N foods every render
-  const { weekDays, weekKcal, weekMacros, maxKcal, avgKcal, avgMacros } = useMemo(() => {
+  const { weekDays, weekKcal, maxKcal, avgKcal, avgMacros } = useMemo(() => {
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(dateKey, i - 6))
     const weekPlans = weekDays.map((d) => getOrCreatePlan(d))
     const weekKcal = weekPlans.map((p) => dailyKcal(p, foods))
