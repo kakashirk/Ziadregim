@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { GoalProvider } from '@/context/GoalContext'
 import { FoodProvider } from '@/context/FoodContext'
 import { PlanProvider } from '@/context/PlanContext'
@@ -24,6 +25,7 @@ export default function App() {
               </Route>
             </Routes>
           </BrowserRouter>
+          <Analytics />
         </PlanProvider>
       </FoodProvider>
     </GoalProvider>
