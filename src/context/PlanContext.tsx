@@ -8,6 +8,7 @@ interface PlanContextValue {
   plans: Record<string, DailyPlan>
   loading: boolean
   getOrCreatePlan: (dateKey: string) => DailyPlan
+  replacePlan: (plan: DailyPlan) => Promise<void>
   addMealEntry: (
     dateKey: string,
     mealType: MealType,
@@ -148,12 +149,17 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     [mutatePlan],
   )
 
+  const replacePlan = useCallback(async (plan: DailyPlan) => {
+    await savePlan(plan)
+  }, [savePlan])
+
   return (
     <PlanContext.Provider
       value={{
         plans,
         loading,
         getOrCreatePlan,
+        replacePlan,
         addMealEntry,
         removeMealEntry,
         updateMealEntryQty,
