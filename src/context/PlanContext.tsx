@@ -67,11 +67,12 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) { setPlans({}); setLoading(false); return }
     setLoading(true)
-    supabase
-      .from('daily_plans')
-      .select('*')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
+    ;(async () => {
+      try {
+        const { data } = await supabase
+          .from('daily_plans')
+          .select('*')
+          .eq('user_id', user.id)
         const map: Record<string, DailyPlan> = {}
         ;(data ?? []).forEach((row) => {
           map[row.date_key] = {
@@ -81,8 +82,9 @@ export function PlanProvider({ children }: { children: ReactNode }) {
           }
         })
         setPlans(map)
-        setLoading(false)
-      })
+      } catch { /* ignore */ }
+      setLoading(false)
+    })()
   }, [user])
 
   const getOrCreatePlan = useCallback(

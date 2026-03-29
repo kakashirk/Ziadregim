@@ -39,15 +39,17 @@ export function FoodProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) { setFoods([]); setLoading(false); return }
     setLoading(true)
-    supabase
-      .from('foods')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => {
+    ;(async () => {
+      try {
+        const { data } = await supabase
+          .from('foods')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
         setFoods((data ?? []).map(rowToFoodItem))
-        setLoading(false)
-      })
+      } catch { /* ignore */ }
+      setLoading(false)
+    })()
   }, [user])
 
   const addFood = useCallback(async (data: Omit<FoodItem, 'id' | 'createdAt'>) => {
