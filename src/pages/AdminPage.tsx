@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Navigate } from 'react-router-dom'
+import { SettingsPage } from '@/pages/SettingsPage'
 
 interface Profile {
   id: string
@@ -29,8 +30,8 @@ function generateToken(): string {
 }
 
 export function AdminPage() {
-  const { isAdmin } = useAuth()
-  const [tab, setTab] = useState<'users' | 'tokens'>('users')
+  const { isAdmin, user } = useAuth()
+  const [tab, setTab] = useState<'users' | 'tokens' | 'settings'>('users')
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [tokens, setTokens] = useState<InviteToken[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +56,26 @@ export function AdminPage() {
   const toggleUserActive = async (profile: Profile) => {
     await supabase.from('profiles').update({ is_active: !profile.is_active }).eq('id', profile.id)
     setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, is_active: !p.is_active } : p))
+  }
+
+  const makeAdmin = async (profile: Profile) => {
+    const { error } = await supabase.rpc('set_user_role', {
+      target_user_id: profile.id,
+      new_role: 'admin',
+    })
+    if (!error) {
+      setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, role: 'admin' } : p))
+    }
+  }
+
+  const removeAdmin = async (profile: Profile) => {
+    const { error } = await supabase.rpc('set_user_role', {
+      target_user_id: profile.id,
+      new_role: 'user',
+    })
+    if (!error) {
+      setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, role: 'user' } : p))
+    }
   }
 
   const createToken = async () => {
@@ -102,14 +123,22 @@ export function AdminPage() {
           onClick={() => setTab('tokens')}
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'tokens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}
         >
-          Tokens d'invitation
+          Tokens
+        </button>
+        <button
+          onClick={() => setTab('settings')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'settings' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}
+        >
+          Réglages
         </button>
       </div>
 
-      {loading ? (
+      {tab === 'settings' ? (
+        <SettingsPage />
+      ) : loading ? (
         <p className="text-sm text-gray-400 text-center py-8">Chargement…</p>
       ) : tab === 'users' ? (
-        <UsersTab profiles={profiles} onToggle={toggleUserActive} />
+        <UsersTab profiles={profiles} onToggle={toggleUserActive} onMakeAdmin={makeAdmin} onRemoveAdmin={removeAdmin} currentUserId={user?.id} />
       ) : (
         <TokensTab
           tokens={tokens}
@@ -125,43 +154,80 @@ export function AdminPage() {
   )
 }
 
-function UsersTab({ profiles, onToggle }: { profiles: Profile[]; onToggle: (p: Profile) => void }) {
+function UsersTab({
+  profiles,
+  onToggle,
+  onMakeAdmin,
+  onRemoveAdmin,
+  currentUserId,
+}: {
+  profiles: Profile[]
+  onToggle: (p: Profile) => void
+  onMakeAdmin: (p: Profile) => void
+  onRemoveAdmin: (p: Profile) => void
+  currentUserId: string | undefined
+}) {
   if (profiles.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">Aucun utilisateur inscrit</p>
   }
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-gray-500">{profiles.length} utilisateur{profiles.length > 1 ? 's' : ''}</p>
-      {profiles.map((p) => (
-        <div key={p.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{p.first_name} {p.last_name}</p>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                {p.role === 'admin' ? 'Admin' : 'Utilisateur'}
-              </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                {p.is_active ? 'Actif' : 'Bloqué'}
-              </span>
+      {profiles.map((p) => {
+        const isSelf = p.id === currentUserId
+        return (
+          <div key={p.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 truncate">
+                {p.first_name} {p.last_name}
+                {isSelf && <span className="ml-1.5 text-xs text-brand-500 font-normal">(moi)</span>}
+              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {p.role === 'admin' ? 'Admin' : 'Utilisateur'}
+                </span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                  {p.is_active ? 'Actif' : 'Bloqué'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Inscrit le {new Date(p.created_at).toLocaleDateString('fr-FR')}
+              </p>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Inscrit le {new Date(p.created_at).toLocaleDateString('fr-FR')}
-            </p>
+            {!isSelf && (
+              <div className="flex flex-col gap-1.5 shrink-0">
+                {p.role === 'admin' ? (
+                  <button
+                    onClick={() => onRemoveAdmin(p)}
+                    className="px-3 py-1.5 rounded-xl bg-orange-50 text-orange-600 text-xs font-semibold hover:bg-orange-100 transition-colors"
+                  >
+                    Retirer admin
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onMakeAdmin(p)}
+                      className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 text-xs font-semibold hover:bg-purple-100 transition-colors"
+                    >
+                      Rendre admin
+                    </button>
+                    <button
+                      onClick={() => onToggle(p)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                        p.is_active
+                          ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                          : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      }`}
+                    >
+                      {p.is_active ? 'Bloquer' : 'Réactiver'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-          {p.role !== 'admin' && (
-            <button
-              onClick={() => onToggle(p)}
-              className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                p.is_active
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                  : 'bg-green-50 text-green-600 hover:bg-green-100'
-              }`}
-            >
-              {p.is_active ? 'Bloquer' : 'Réactiver'}
-            </button>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
