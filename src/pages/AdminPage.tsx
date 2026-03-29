@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Navigate } from 'react-router-dom'
+import { SettingsPage } from '@/pages/SettingsPage'
 
 interface Profile {
   id: string
@@ -30,7 +31,7 @@ function generateToken(): string {
 
 export function AdminPage() {
   const { isAdmin } = useAuth()
-  const [tab, setTab] = useState<'users' | 'tokens'>('users')
+  const [tab, setTab] = useState<'users' | 'tokens' | 'settings'>('users')
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [tokens, setTokens] = useState<InviteToken[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +56,16 @@ export function AdminPage() {
   const toggleUserActive = async (profile: Profile) => {
     await supabase.from('profiles').update({ is_active: !profile.is_active }).eq('id', profile.id)
     setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, is_active: !p.is_active } : p))
+  }
+
+  const makeAdmin = async (profile: Profile) => {
+    const { error } = await supabase.rpc('set_user_role', {
+      target_user_id: profile.id,
+      new_role: 'admin',
+    })
+    if (!error) {
+      setProfiles((prev) => prev.map((p) => p.id === profile.id ? { ...p, role: 'admin' } : p))
+    }
   }
 
   const createToken = async () => {
@@ -102,14 +113,22 @@ export function AdminPage() {
           onClick={() => setTab('tokens')}
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'tokens' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}
         >
-          Tokens d'invitation
+          Tokens
+        </button>
+        <button
+          onClick={() => setTab('settings')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'settings' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}
+        >
+          Réglages
         </button>
       </div>
 
-      {loading ? (
+      {tab === 'settings' ? (
+        <SettingsPage />
+      ) : loading ? (
         <p className="text-sm text-gray-400 text-center py-8">Chargement…</p>
       ) : tab === 'users' ? (
-        <UsersTab profiles={profiles} onToggle={toggleUserActive} />
+        <UsersTab profiles={profiles} onToggle={toggleUserActive} onMakeAdmin={makeAdmin} />
       ) : (
         <TokensTab
           tokens={tokens}
@@ -125,7 +144,15 @@ export function AdminPage() {
   )
 }
 
-function UsersTab({ profiles, onToggle }: { profiles: Profile[]; onToggle: (p: Profile) => void }) {
+function UsersTab({
+  profiles,
+  onToggle,
+  onMakeAdmin,
+}: {
+  profiles: Profile[]
+  onToggle: (p: Profile) => void
+  onMakeAdmin: (p: Profile) => void
+}) {
   if (profiles.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">Aucun utilisateur inscrit</p>
   }
@@ -149,16 +176,24 @@ function UsersTab({ profiles, onToggle }: { profiles: Profile[]; onToggle: (p: P
             </p>
           </div>
           {p.role !== 'admin' && (
-            <button
-              onClick={() => onToggle(p)}
-              className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                p.is_active
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                  : 'bg-green-50 text-green-600 hover:bg-green-100'
-              }`}
-            >
-              {p.is_active ? 'Bloquer' : 'Réactiver'}
-            </button>
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <button
+                onClick={() => onMakeAdmin(p)}
+                className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 text-xs font-semibold hover:bg-purple-100 transition-colors"
+              >
+                Rendre admin
+              </button>
+              <button
+                onClick={() => onToggle(p)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                  p.is_active
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                    : 'bg-green-50 text-green-600 hover:bg-green-100'
+                }`}
+              >
+                {p.is_active ? 'Bloquer' : 'Réactiver'}
+              </button>
+            </div>
           )}
         </div>
       ))}
