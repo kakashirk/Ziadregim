@@ -72,16 +72,19 @@ export function AdminPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 6000)
     try {
       const [{ data: prof }, { data: tok }] = await Promise.all([
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }),
-        supabase.from('invite_tokens').select('*').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }).abortSignal(controller.signal),
+        supabase.from('invite_tokens').select('*').order('created_at', { ascending: false }).abortSignal(controller.signal),
       ])
       setProfiles((prof ?? []) as Profile[])
       setTokens((tok ?? []) as InviteToken[])
     } catch {
       // silently ignore — affiche liste vide
     }
+    clearTimeout(timer)
     setLoading(false)
   }, [])
 
