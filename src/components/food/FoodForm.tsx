@@ -220,13 +220,12 @@ export function FoodForm({ initial, onSubmit, onCancel, submitLabel = 'Ajouter' 
         ))}
       </Select>
 
-      {/* Macros section — collapsible */}
-      <MacroFields
+      {/* Macros section — read-only display */}
+      <MacroDisplay
         proteins={form.proteins}
         lipids={form.lipids}
         carbs={form.carbs}
         fiber={form.fiber}
-        onChange={(key, val) => set(key as keyof FoodFormData, val as FoodFormData[keyof FoodFormData])}
       />
 
       <div className="flex gap-3 pt-2">
@@ -241,53 +240,35 @@ export function FoodForm({ initial, onSubmit, onCancel, submitLabel = 'Ajouter' 
   )
 }
 
-function MacroFields({
+function MacroDisplay({
   proteins, lipids, carbs, fiber,
-  onChange,
 }: {
   proteins?: number; lipids?: number; carbs?: number; fiber?: number
-  onChange: (key: string, val: number | undefined) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const hasValues = proteins || lipids || carbs || fiber
+  const hasValues = proteins != null || lipids != null || carbs != null || fiber != null
+  if (!hasValues) {
+    return (
+      <p className="text-xs text-gray-400 text-center italic">
+        Macronutriments non disponibles — sélectionnez un aliment depuis la base pour les obtenir automatiquement.
+      </p>
+    )
+  }
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-      >
-        <span>Macronutriments <span className="text-xs font-normal text-gray-400">(optionnel)</span></span>
-        <div className="flex items-center gap-2">
-          {hasValues && <span className="text-xs text-brand-600 font-semibold">P·G·L·F</span>}
-          <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
-      {open && (
-        <div className="px-3 pb-3 pt-1 grid grid-cols-2 gap-3 border-t border-gray-100">
-          {([
-            ['proteins', 'Protéines (g/100g)', proteins],
-            ['lipids',   'Lipides (g/100g)',    lipids],
-            ['carbs',    'Glucides (g/100g)',    carbs],
-            ['fiber',    'Fibres (g/100g)',      fiber],
-          ] as [string, string, number | undefined][]).map(([key, label, val]) => (
-            <div key={key} className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-gray-600">{label}</label>
-              <input
-                type="number"
-                min={0}
-                step={0.1}
-                value={val ?? ''}
-                onChange={(e) => onChange(key, e.target.value === '' ? undefined : Number(e.target.value))}
-                className="block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="0"
-              />
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs font-medium text-gray-500">Macronutriments (pour 100g)</p>
+      <div className="grid grid-cols-4 gap-2">
+        {([
+          ['P', proteins, 'text-blue-600', 'bg-blue-50', 'border-blue-200'],
+          ['G', carbs,    'text-orange-600', 'bg-orange-50', 'border-orange-200'],
+          ['L', lipids,   'text-yellow-600', 'bg-yellow-50', 'border-yellow-200'],
+          ['F', fiber,    'text-green-600', 'bg-green-50', 'border-green-200'],
+        ] as [string, number | undefined, string, string, string][]).map(([label, val, textCls, bgCls, borderCls]) => (
+          <div key={label} className={`${bgCls} border ${borderCls} rounded-xl p-2 text-center`}>
+            <p className={`text-sm font-bold ${textCls}`}>{val ?? '—'}g</p>
+            <p className="text-xs text-gray-500">{label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
