@@ -112,3 +112,36 @@ create policy "settings_own" on public.user_settings
 -- update auth.users
 --   set app_metadata = jsonb_set(coalesce(app_metadata, '{}'), '{role}', '"admin"')
 --   where email like '%yassinjost%';
+
+-- ============================================================
+-- ANALYTICS — Sessions et pages vues
+-- À exécuter dans : Supabase Dashboard > SQL Editor
+-- ============================================================
+
+-- 6. USER SESSIONS (suivi connexions/déconnexions)
+create table if not exists public.user_sessions (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid references auth.users on delete cascade not null,
+  logged_in_at   timestamptz not null default now(),
+  logged_out_at  timestamptz
+);
+alter table public.user_sessions enable row level security;
+create policy "sessions_own_insert" on public.user_sessions for insert with check (auth.uid() = user_id);
+create policy "sessions_own_update" on public.user_sessions for update using (auth.uid() = user_id);
+create policy "sessions_admin_all"  on public.user_sessions for all using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+-- 7. PAGE VIEWS (suivi navigation)
+create table if not exists public.page_views (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users on delete cascade not null,
+  page       text not null,
+  viewed_at  timestamptz not null default now()
+);
+alter table public.page_views enable row level security;
+create policy "pageviews_own_insert" on public.page_views for insert with check (auth.uid() = user_id);
+create policy "pageviews_admin_all"  on public.page_views for all using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+-- Policies admin pour lire/supprimer les données de tous les utilisateurs
+create policy "foods_admin_all"    on public.foods        for all using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+create policy "plans_admin_all"    on public.daily_plans  for all using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+create policy "settings_admin_all" on public.user_settings for all using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
