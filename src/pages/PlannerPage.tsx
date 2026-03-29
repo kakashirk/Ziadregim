@@ -10,6 +10,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { generateDayMeals, canGenerate, computeSlotRatios } from '@/utils/mealGenerator'
 import { todayKey, addDays, displayDate } from '@/utils/date'
+import { usePlanActions } from '@/hooks/usePlanActions'
 import { MEAL_LABELS } from '@/types'
 import type { MealType } from '@/types'
 
@@ -19,7 +20,8 @@ export function PlannerPage() {
   const { date } = useParams<{ date: string }>()
   const dateKey = date ?? todayKey()
   const navigate = useNavigate()
-  const { getOrCreatePlan, replacePlan, toggleSkipMeal, loading } = usePlan()
+  const { getOrCreatePlan, toggleSkipMeal, loading } = usePlan()
+  const actions = usePlanActions(dateKey)
   const { foods } = useFood()
   const { goal } = useGoal()
   const { total } = useCalories(dateKey)
@@ -56,7 +58,7 @@ export function PlannerPage() {
     setGenerating(true)
     await new Promise((r) => setTimeout(r, 80))
     const newPlan = generateDayMeals(dateKey, foods, goal.kcal, skippedMeals)
-    await replacePlan(newPlan)
+    await actions.replaceWithNewPlan(newPlan)
     setGenerating(false)
     setConfirmGenerate(false)
   }

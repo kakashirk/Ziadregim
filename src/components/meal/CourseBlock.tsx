@@ -3,6 +3,7 @@ import { MealItem } from './MealItem'
 import { AddMealItemModal } from './AddMealItemModal'
 import { COURSE_LABELS } from '@/types'
 import type { Course, MealType, CourseType } from '@/types'
+import type { usePlanActions } from '@/hooks/usePlanActions'
 
 const courseEmojis: Record<CourseType, string> = {
   entree: '🥗',
@@ -11,15 +12,12 @@ const courseEmojis: Record<CourseType, string> = {
 }
 
 interface CourseBlockProps {
-  dateKey: string
-  mealType: MealType
   course: Course
-  onAdd: (foodId: string, quantity: number) => void
-  onRemove: (entryId: string) => void
-  onUpdateQty: (entryId: string, qty: number) => void
+  actions: ReturnType<typeof usePlanActions>
+  mealType: MealType
 }
 
-export function CourseBlock({ course, onAdd, onRemove, onUpdateQty }: CourseBlockProps) {
+export function CourseBlock({ course, actions, mealType }: CourseBlockProps) {
   const [modalOpen, setModalOpen] = useState(false)
 
   return (
@@ -48,8 +46,8 @@ export function CourseBlock({ course, onAdd, onRemove, onUpdateQty }: CourseBloc
             <MealItem
               key={entry.id}
               entry={entry}
-              onRemove={() => onRemove(entry.id)}
-              onUpdateQty={(qty) => onUpdateQty(entry.id, qty)}
+              onRemove={() => actions.remove(mealType, course.type, entry.id)}
+              onUpdateQty={(qty) => actions.updateQty(mealType, course.type, entry.id, qty)}
             />
           ))}
         </div>
@@ -58,7 +56,7 @@ export function CourseBlock({ course, onAdd, onRemove, onUpdateQty }: CourseBloc
       <AddMealItemModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onAdd={onAdd}
+        onAdd={(foodId, quantity) => actions.add(mealType, course.type, foodId, quantity)}
         title={`Ajouter — ${COURSE_LABELS[course.type]}`}
       />
     </div>

@@ -51,6 +51,10 @@ export function FoodForm({ initial, onSubmit, onCancel, submitLabel = 'Ajouter' 
       gramsPerUnit: item.gramsPerUnit,
       quantityInStock: 0,
       category: item.category,
+      proteins: item.proteins,
+      lipids: item.lipids,
+      carbs: item.carbs,
+      fiber: item.fiber,
     })
     setStep('details')
   }
@@ -216,6 +220,15 @@ export function FoodForm({ initial, onSubmit, onCancel, submitLabel = 'Ajouter' 
         ))}
       </Select>
 
+      {/* Macros section — collapsible */}
+      <MacroFields
+        proteins={form.proteins}
+        lipids={form.lipids}
+        carbs={form.carbs}
+        fiber={form.fiber}
+        onChange={(key, val) => set(key as keyof FoodFormData, val as FoodFormData[keyof FoodFormData])}
+      />
+
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onCancel} fullWidth>
           Annuler
@@ -225,5 +238,56 @@ export function FoodForm({ initial, onSubmit, onCancel, submitLabel = 'Ajouter' 
         </Button>
       </div>
     </form>
+  )
+}
+
+function MacroFields({
+  proteins, lipids, carbs, fiber,
+  onChange,
+}: {
+  proteins?: number; lipids?: number; carbs?: number; fiber?: number
+  onChange: (key: string, val: number | undefined) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const hasValues = proteins || lipids || carbs || fiber
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        <span>Macronutriments <span className="text-xs font-normal text-gray-400">(optionnel)</span></span>
+        <div className="flex items-center gap-2">
+          {hasValues && <span className="text-xs text-brand-600 font-semibold">P·G·L·F</span>}
+          <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 pt-1 grid grid-cols-2 gap-3 border-t border-gray-100">
+          {([
+            ['proteins', 'Protéines (g/100g)', proteins],
+            ['lipids',   'Lipides (g/100g)',    lipids],
+            ['carbs',    'Glucides (g/100g)',    carbs],
+            ['fiber',    'Fibres (g/100g)',      fiber],
+          ] as [string, string, number | undefined][]).map(([key, label, val]) => (
+            <div key={key} className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600">{label}</label>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={val ?? ''}
+                onChange={(e) => onChange(key, e.target.value === '' ? undefined : Number(e.target.value))}
+                className="block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="0"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

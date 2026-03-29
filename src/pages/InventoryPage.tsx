@@ -11,7 +11,7 @@ export function InventoryPage() {
   return (
     <div className="p-4 flex flex-col gap-4 pb-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Mes aliments</h1>
+        <h1 className="text-lg font-bold text-gray-900">Garde-manger</h1>
         <button
           onClick={() => setOpen(true)}
           className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-2 rounded-xl shadow-sm transition-colors"
