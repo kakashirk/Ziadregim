@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
+import { DbError } from '@/components/ui/DbError'
 import { Navigate } from 'react-router-dom'
 import { SettingsPage } from '@/pages/SettingsPage'
 
@@ -64,6 +65,7 @@ export function AdminPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [tokens, setTokens] = useState<InviteToken[]>([])
   const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState<string | null>(null)
   const [newLabel, setNewLabel] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
@@ -72,17 +74,18 @@ export function AdminPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
+    setDbError(null)
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 6000)
     try {
-      const [{ data: prof }, { data: tok }] = await Promise.all([
+      const [{ data: prof, error: e1 }, { data: tok, error: e2 }] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: false }).abortSignal(controller.signal),
         supabase.from('invite_tokens').select('*').order('created_at', { ascending: false }).abortSignal(controller.signal),
       ])
-      setProfiles((prof ?? []) as Profile[])
-      setTokens((tok ?? []) as InviteToken[])
-    } catch {
-      // silently ignore — affiche liste vide
+      if (e1 ?? e2) setDbError((e1 ?? e2)!.message)
+      else { setProfiles((prof ?? []) as Profile[]); setTokens((tok ?? []) as InviteToken[]) }
+    } catch (e) {
+      setDbError(e instanceof Error ? e.message : 'Timeout ou erreur réseau')
     }
     clearTimeout(timer)
     setLoading(false)
@@ -148,6 +151,8 @@ export function AdminPage() {
         <SettingsPage />
       ) : loading ? (
         <p className="text-sm text-gray-400 text-center py-8">Chargement…</p>
+      ) : dbError ? (
+        <DbError message={dbError} onRetry={loadData} />
       ) : tab === 'users' ? (
         <UsersTab
           profiles={profiles}

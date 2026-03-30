@@ -3,6 +3,7 @@ import { useFood } from '@/context/FoodContext'
 import { FoodCard } from './FoodCard'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { DbError } from '@/components/ui/DbError'
 
 export function FoodList() {
   const { foods, loading, dbError } = useFood()
@@ -27,11 +28,7 @@ export function FoodList() {
   }
 
   if (dbError) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs text-red-700 font-mono break-all">
-        Erreur DB : {dbError}
-      </div>
-    )
+    return <DbError message={dbError} onRetry={() => window.location.reload()} />
   }
 
   return (
