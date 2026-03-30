@@ -8,6 +8,7 @@ import { MEAL_COURSES } from '@/types'
 interface PlanContextValue {
   plans: Record<string, DailyPlan>
   loading: boolean
+  dbError: string | null
   getOrCreatePlan: (dateKey: string) => DailyPlan
   replacePlan: (plan: DailyPlan) => Promise<void>
   toggleSkipMeal: (dateKey: string, mealType: MealType) => Promise<void>
@@ -63,29 +64,36 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [plans, setPlans] = useState<Record<string, DailyPlan>>({})
   const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) { setPlans({}); setLoading(false); return }
     setLoading(true)
+    setDbError(null)
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 6000)
     ;(async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('daily_plans')
           .select('*')
           .eq('user_id', user.id)
           .abortSignal(controller.signal)
-        const map: Record<string, DailyPlan> = {}
-        ;(data ?? []).forEach((row) => {
-          map[row.date_key] = {
-            dateKey: row.date_key,
-            meals: row.meals as Meal[],
-            skippedMeals: row.skipped_meals as MealType[],
-          }
-        })
-        setPlans(map)
-      } catch { /* ignore */ }
+        if (error) { setDbError(error.message); }
+        else {
+          const map: Record<string, DailyPlan> = {}
+          ;(data ?? []).forEach((row) => {
+            map[row.date_key] = {
+              dateKey: row.date_key,
+              meals: row.meals as Meal[],
+              skippedMeals: row.skipped_meals as MealType[],
+            }
+          })
+          setPlans(map)
+        }
+      } catch (e) {
+        setDbError(e instanceof Error ? e.message : 'Timeout ou erreur réseau')
+      }
       clearTimeout(timer)
       setLoading(false)
     })()
@@ -185,8 +193,8 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   )
 
   const value = useMemo(
-    () => ({ plans, loading, getOrCreatePlan, replacePlan, toggleSkipMeal, addMealEntry, removeMealEntry, updateMealEntryQty }),
-    [plans, loading, getOrCreatePlan, replacePlan, toggleSkipMeal, addMealEntry, removeMealEntry, updateMealEntryQty],
+    () => ({ plans, loading, dbError, getOrCreatePlan, replacePlan, toggleSkipMeal, addMealEntry, removeMealEntry, updateMealEntryQty }),
+    [plans, loading, dbError, getOrCreatePlan, replacePlan, toggleSkipMeal, addMealEntry, removeMealEntry, updateMealEntryQty],
   )
 
   return <PlanContext.Provider value={value}>{children}</PlanContext.Provider>
