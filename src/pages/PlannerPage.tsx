@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { DbError } from '@/components/ui/DbError'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePlan } from '@/context/PlanContext'
 import { useFood } from '@/context/FoodContext'
@@ -21,7 +22,7 @@ export function PlannerPage() {
   const { date } = useParams<{ date: string }>()
   const dateKey = date ?? todayKey()
   const navigate = useNavigate()
-  const { getOrCreatePlan, toggleSkipMeal, loading } = usePlan()
+  const { getOrCreatePlan, toggleSkipMeal, loading, dbError: planError } = usePlan()
   const actions = usePlanActions(dateKey)
   const { foods } = useFood()
   const { goal } = useGoal()
@@ -86,6 +87,10 @@ export function PlannerPage() {
         <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
+  }
+
+  if (planError) {
+    return <DbError message={planError} onRetry={() => window.location.reload()} />
   }
 
   const activeMealCount = MEAL_ORDER.filter((m) => !skippedMeals.includes(m)).length
