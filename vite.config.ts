@@ -13,6 +13,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      selfDestroying: true,
       includeAssets: ['icons/*.png', 'icons/*.svg'],
       manifest: {
         name: 'ZiadRegim — Suivi Calorique',
